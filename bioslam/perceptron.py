@@ -1,0 +1,5 @@
+"""
+
+Simple perceptron neural network
+
+"""
