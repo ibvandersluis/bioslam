@@ -1,51 +1,48 @@
 """
 
 Simple perceptron neural network
-Author: i am trask 
+Author: i am trask
 URL: https://iamtrask.github.io/2015/07/12/basic-python-network/
+Video: https://www.youtube.com/watch?v=kft1AJ9WVDk
 
 """
 
-# Code from 
-
 import numpy as np
 
-# sigmoid function
+# Sigmoid function
 def nonlin(x,deriv=False):
     if(deriv==True):
         return x*(1-x)
     return 1/(1+np.exp(-x))
 
-# input dataset
+# Input dataset
 X = np.array([  [0,0,1],
                 [0,1,1],
                 [1,0,1],
                 [1,1,1] ])
 
-# output dataset           
+# Output dataset           
 y = np.array([[0,0,1,1]]).T
 
-# seed random numbers to make calculation
-# deterministic (just a good practice)
+# Seed random numbers to make calculation deterministic
 np.random.seed(1)
 
-# initialize weights randomly with mean 0
+# Initialize synaptic weights randomly with mean 0
 syn0 = 2 * np.random.random_sample((3,1)) - 1
 
 for iter in range(10000):
 
-    # forward propagation
-    l0 = X
-    l1 = nonlin(np.dot(l0,syn0))
+    # Forward propagation
+    l0 = X # Inputs
+    l1 = nonlin(np.dot(l0,syn0)) # Outputs
 
-    # how much did we miss?
-    l1_error = y - l1
+    # Calculate error
+    l1_error = y - l1 # Training outputs - outputs
 
-    # multiply how much we missed by the
-    # slope of the sigmoid at the values in l1
-    l1_delta = l1_error * nonlin(l1,True)
+    # Calculate adjustments
+    l1_delta = l1_error * nonlin(l1,True) # Multiply error by sigmoid derivatives of outputs
 
-    # update weights
+    # Update weights
     syn0 += np.dot(l0.T,l1_delta)
 
 print("Output After Training:")
