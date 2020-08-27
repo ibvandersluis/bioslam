@@ -1,6 +1,6 @@
 """
 
-Kohonen network for competitive learning
+Kohonen network for competitive learning to classify irises
 Author: Artem Kovera
 URL: http://www.kovera.org/neural-network-for-clustering-in-python/
 
@@ -78,6 +78,7 @@ print(W)
 la = 0.3    # λ coefficient
 dla = 0.05  # Δλ
 
+# Training
 while la >= 0:
     for k in range(10):
         for x in X:
