@@ -21,17 +21,19 @@ from std_msgs.msg import String
 
 # VERSION 1
 
-# Input: 2 inputs, 1 for each of the nearest cones on the left and right
-# Output: A 2x2 grid
-
-# Due to the small size of the output layer, it is impractical to implement a true
-# Kohonen network, which also updates the weights of the units in the winner's neighbourhood.
-# Therefore only the weights of the winner will be updated.
+# Input: 2 input vectors, 1 for each of the x and y position values at a given timestep
+# Output: A 2x2 grid of nodes, each represented by a set of weights connected to each input
 
 # Declare constants
-DIM_X = 2 # Dimensionality of X input vectors
-LA = 0.3    # λ coefficient
-DLA = 0.05  # Δλ
+IN_MAX = 30 # Max input amount (i.e. max number of cones at once)
+IN_VECT = 2 # The number of input vectors
+X_OUT = 500 # X size of output layer
+Y_OUT = 500 # Y size of output layer
+MAP_R = max(X_OUT, Y_OUT)/2 # Radius of map at t0
+ITER = 50000 # Number of iterations
+TIME_CONST = ITER / np.log(MAP_R)
+LAM = 0.3    # λ coefficient
+DLAM = 0.05  # Δλ
 
 def distance(w, x):
     r = 0
@@ -46,10 +48,17 @@ class Listener(BaseListener):
     def __init__(self):
         super().__init__('bioslam')
 
+        # Initialise some member variables
+        self.t = 0 # Timestep (iteration count)
+        self.lam = LAM # The learning rate, λ coefficient
+        self.n_rad = MAP_R # Neighbourhood radius
+
         # Initialize weights
-        self.w = np.random.rand(2, 2)
+        self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT)
         norm = np.linalg.norm(self.w)
-        self.w /= norm # Normalise
+        self.w /= norm # Normalise (? ask Alex)
+        self.diff = None # Difference between inputs and weights (capture - W)
+        self.distances = None
 
         # Initialize inputs
         self.capture = []
@@ -65,11 +74,35 @@ class Listener(BaseListener):
         self.gnss_sub = self.create_subscription(NavSatFix, '/peak_gps/gps', self.gnss_callback, 10)
         self.imu_sub = self.create_subscription(IMU, '/peak_gps/imu', self.imu_callback, 10)
         self.control_sub = self.create_subscription(Twist, '/gazebo/cmd_vel', self.control_callback, 10)
+    
+    def compute_influence(self, x, y):
+        theta = np.exp(-(self.distances[x, y]**2)/(2 * self.n_rad**2))
+
+        return theta
+
+    def compute_lambda(self):
+        self.lam = LAM * np.exp(-self.t/ITER)
+
+    def compute_radius(self):
+        self.n_rad = MAP_R * np.exp(-self.t/TIME_CONST)
+
+    def compute_weights(self, x, y):
+        old_weights = self.w[x, y]
+        theta = self.compute_influence(x, y)
+        new_weights = old_weights + theta * self.lam * self.diff[x, y]
+
+        return new_weights
 
     def cones_callback(self, msg: ConeArray):
         # Place x y positions of cones into self.capture
         self.capture = np.array([[cone.x, cone.y] for cone in msg.cones])
+        # Pad capture array with zeros for give it a shape of (IN_MAX, IN_VECT)
+        self.capture = np.vstack((np.capture, np.zeros((30 - len(self.capture[:, 0]), IN_VECT))))
         print(self.capture)
+
+        bmu = self.get_bmu()
+
+        neighbourhood = np.argwhere(self.distances < self.n_rad)
 
     def control_callback(self, msg: Twist):
         str(msg) # For some reason this is needed to access msg.linear.x
@@ -78,6 +111,24 @@ class Listener(BaseListener):
         self.u = np.array([self.v, self.yaw]).reshape(2, 1)
 
         self.get_logger().info(f'Command confirmed: {msg.linear.x} m/s turning at {msg.angular.z} rad/s')
+
+    def get_bmu(self):
+        """
+        Determines the X-Y position of the winning node in the output layer
+        """
+        # Make self.capture 4D
+        cap = np.zeros((1, 1, IN_MAX, IN_VECT))
+        cap += self.capture
+
+        self.diff = cap - self.w # Calculate differences
+
+        # Calculate distances between the input and each node
+        results = np.sqrt(np.sum((self.w - cap)**2, axis=(2, 3)))
+        # Get X-Y position of the node with the minimum distance
+        bmu = np.unravel_index(np.argmin(results, axis = None), results.shape)
+        self.distances = np.copy(results)
+
+        return bmu
 
     def gnss_callback(self, msg: NavSatFix()):
         # Log data retrieval
