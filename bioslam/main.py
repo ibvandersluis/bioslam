@@ -55,6 +55,12 @@ class Listener(BaseListener):
         self.cones_sub = self.create_subscription(ConeArray, '/cones/positions', self.cones_callback, 10)
     
     def compute_bmu_distances(self, bmu):
+        """
+        Calculates the Euclidian distance between all output nodes and the BMU
+
+        :param bmu: The coordinates of the BMU on the output layer
+        :return: d, a matrix of distances corresponding to node coordinates
+        """
         diff = bmu - self.coords
         d_sq = diff[:, 0]**2 + diff[:, 1]**2
         d = np.sqrt(d_sq).reshape((X_OUT, Y_OUT))
@@ -88,6 +94,9 @@ class Listener(BaseListener):
     def get_bmu(self, x):
         """
         Determines the X-Y position of the winning node in the output layer
+
+        :param x: The input array
+        :return: bmu, the coordinates of the best matching unit
         """
         # Make self.capture 4D
         j = time.time()
@@ -117,6 +126,12 @@ class Listener(BaseListener):
         return x, y
 
     def L(self, t):
+        """
+        Calculates the learning rate for the given timestep
+
+        :param t: The given timestep
+        :return: Lt
+        """
         return L0 * np.exp(-t/LAM)
 
     def N(self, dist, t):
@@ -124,7 +139,7 @@ class Listener(BaseListener):
         Computes the neighbouring penalty N
 
         :param dist: An array of distances to the BMU, matching the shape of the output layer
-        :param t: The current timestep
+        :param t: The given timestep
         """
         sigma_t = self.sigma(t)
         return np.exp(-(dist**2)/(2 * sigma_t**2))
@@ -137,12 +152,29 @@ class Listener(BaseListener):
         plt.clf()
     
     def quant_err(self):
+        """
+        Measures the quantisation error, the average difference between the input and the BMU
+
+        :return: The quantisation error
+        """
         return np.array(self.bmu_dists).mean()
     
     def sigma(self, t):
+        """
+        Calculates sigma(t), the neighbourhood radius for the given timestep
+
+        :param t: The given timestep
+        :return: sigma(t)
+        """
         return SIGMA0 * np.exp(-t/LAM)
 
     def update(self, dist, t):
+        """
+        Calculates new weights for the SOM
+
+        :param dist: The array of distances for each node from the BMU
+        :param t: The given timestep
+        """
         Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1, 1))
         self.w += Ndt * self.L(t) * self.diff
 
