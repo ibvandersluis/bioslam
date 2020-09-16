@@ -35,14 +35,6 @@ TIME_CONST = ITER / np.log(MAP_R)
 LAM = 0.3    # λ coefficient
 DLAM = 0.05  # Δλ
 
-def distance(w, x):
-    r = 0
-    for i in range(len(w)):
-        r = r + (w[i] - x[i])*(w[i] - x[i])
-    
-    r = np.sqrt(r)
-    return r
-
 class Listener(BaseListener):
 
     def __init__(self):
@@ -86,9 +78,8 @@ class Listener(BaseListener):
 
         self.distances = d
 
-    # TODO fix this! Don't use distance from input, use distance from BMU
-    def compute_influence(self, x, y):
-        theta = np.exp(-(self.distances[x, y]**2)/(2 * self.n_rad**2))
+    def compute_influence(self):
+        theta = np.exp(-(self.distances**2)/(2 * self.n_rad**2))
 
         return theta
 
@@ -98,24 +89,31 @@ class Listener(BaseListener):
     def compute_radius(self):
         self.n_rad = MAP_R * np.exp(-self.t/TIME_CONST)
 
-    def compute_weights(self, x, y):
-        old_weights = self.w[x, y]
-        theta = self.compute_influence(x, y)
-        new_weights = old_weights + theta * self.lam * self.diff[x, y]
-
-        return new_weights
+    def compute_weights(self, nbh):
+        old_weights = np.copy(self.w)[nbh[:, 0], nbh[:, 1]]
+        theta = self.compute_influence()[nbh[:, 0], nbh[:, 1]]
+        self.w[nbh[:, 0], nbh[:, 1]] = old_weights + theta * self.lam * self.diff[nbh[:, 0], nbh[:, 1]]
 
     def cones_callback(self, msg: ConeArray):
+        if (self.n_rad < 1):
+            return
         # Place x y positions of cones into self.capture
         self.capture = np.array([[cone.x, cone.y] for cone in msg.cones])
         # Pad capture array with zeros for give it a shape of (IN_MAX, IN_VECT)
         self.capture = np.vstack((np.capture, np.zeros((30 - len(self.capture[:, 0]), IN_VECT))))
         print(self.capture)
 
-        bmu = self.get_bmu()
+        bmu = self.get_bmu() # Determine BMU coordinates
 
-        neighbourhood = np.argwhere(self.distances < self.n_rad)
+        self.compute_bmu_distances(bmu) # Calculate distance from each node to BMU
 
+        nbh = np.argwhere(self.distances <= self.n_rad) # Get indices of neighbourhood
+
+        self.compute_weights(nbh) # Compute weights of neighbourhood nodes
+
+        self.t += 1 # Increment timestep
+        self.compute_lambda()
+        self.compute_radius()
     def control_callback(self, msg: Twist):
         str(msg) # For some reason this is needed to access msg.linear.x
         self.v = msg.linear.x
