@@ -6,10 +6,7 @@ import message_filters
 import rclpy
 import numpy as np
 import matplotlib.pyplot as plt
-import math
 import time
-import scipy.stats
-from copy import deepcopy
 from helpers.listener import BaseListener
 from helpers import shortcuts
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
@@ -17,7 +14,6 @@ from obr_msgs.msg import Cone, CarPos, ConeArray, IMU, Label
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point, Twist, Vector3
 from gazebo_msgs.msg import LinkStates
-from std_msgs.msg import String
 
 # VERSION 1
 
@@ -27,10 +23,10 @@ from std_msgs.msg import String
 # Declare constants
 IN_MAX = 30 # Max input amount (i.e. max number of cones at once)
 IN_VECT = 2 # The number of input vectors
-X_OUT = 500 # X size of output layer
-Y_OUT = 500 # Y size of output layer
+X_OUT = 100 # X size of output layer
+Y_OUT = 100 # Y size of output layer
 MAP_R = max(X_OUT, Y_OUT)/2 # Radius of map at t0
-ITER = 50000 # Number of iterations
+ITER = 1000 # Number of iterations
 TIME_CONST = ITER / np.log(MAP_R)
 LAM = 0.3    # λ coefficient
 DLAM = 0.05  # Δλ
@@ -90,8 +86,8 @@ class Listener(BaseListener):
         self.n_rad = MAP_R * np.exp(-self.t/TIME_CONST)
 
     def compute_weights(self, nbh):
-        old_weights = np.copy(self.w)[nbh[:, 0], nbh[:, 1]]
-        theta = self.compute_influence()[nbh[:, 0], nbh[:, 1]]
+        old_weights = self.w[nbh[:, 0], nbh[:, 1]]
+        theta = self.compute_influence()[nbh[:, 0], nbh[:, 1]].reshape(len(old_weights[:]), 1, 1)
         self.w[nbh[:, 0], nbh[:, 1]] = old_weights + theta * self.lam * self.diff[nbh[:, 0], nbh[:, 1]]
 
     def cones_callback(self, msg: ConeArray):
@@ -100,17 +96,21 @@ class Listener(BaseListener):
         # Place x y positions of cones into self.capture
         self.capture = np.array([[cone.x, cone.y] for cone in msg.cones])
         # Pad capture array with zeros for give it a shape of (IN_MAX, IN_VECT)
-        self.capture = np.vstack((np.capture, np.zeros((30 - len(self.capture[:, 0]), IN_VECT))))
-        print(self.capture)
-
+        self.capture = np.vstack((self.capture, np.zeros((30 - len(self.capture[:, 0]), IN_VECT))))
+        a = time.time()
         bmu = self.get_bmu() # Determine BMU coordinates
-
+        b = time.time()
         self.compute_bmu_distances(bmu) # Calculate distance from each node to BMU
-
+        c = time.time()
         nbh = np.argwhere(self.distances <= self.n_rad) # Get indices of neighbourhood
-
+        d = time.time()
         self.compute_weights(nbh) # Compute weights of neighbourhood nodes
-
+        e = time.time()
+        print('get bmu: ' + str(b-a))
+        print('compute dist: ' + str(c-b))
+        print('get nbh: ' + str(d-c))
+        print('compute weight: ' + str(e-d))
+        print('t: ' + str(self.t), '\nlambda: ' + str(self.lam), '\nrad: ' + str(self.n_rad))
         self.t += 1 # Increment timestep
         self.compute_lambda()
         self.compute_radius()
@@ -127,15 +127,22 @@ class Listener(BaseListener):
         Determines the X-Y position of the winning node in the output layer
         """
         # Make self.capture 4D
+        j = time.time()
         cap = np.zeros((1, 1, IN_MAX, IN_VECT))
         cap += self.capture
-
+        k = time.time()
         self.diff = cap - self.w # Calculate differences
-
+        l = time.time()
         # Calculate distances between the input and each node
         results = np.sqrt(np.sum((self.w - cap)**2, axis=(2, 3)))
+        m = time.time()
         # Get X-Y position of the node with the minimum distance
         bmu = np.unravel_index(np.argmin(results, axis = None), results.shape)
+        n = time.time()
+        print('make 4d: ' + str(k-j))
+        print('diff: ' + str(l-k))
+        print('results: ' + str(m-l))
+        print('bmu: ' + str(n-m))
 
         return bmu
 
