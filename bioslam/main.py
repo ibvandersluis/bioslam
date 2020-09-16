@@ -53,12 +53,16 @@ class Listener(BaseListener):
         self.lam = LAM # The learning rate, λ coefficient
         self.n_rad = MAP_R # Neighbourhood radius
 
+        # Initialise arrays
+        self.coords = np.indices((X_OUT, Y_OUT))
+        self.coords = np.flip(self.coords.T, axis=2).reshape((X_OUT * Y_OUT, 2))
+        self.diff = None # Difference between inputs and weights (capture - W)
+        self.distances = None # Array of distances to the BMU
+
         # Initialize weights
         self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT)
         norm = np.linalg.norm(self.w)
         self.w /= norm # Normalise (? ask Alex)
-        self.diff = None # Difference between inputs and weights (capture - W)
-        self.distances = None
 
         # Initialize inputs
         self.capture = []
@@ -75,6 +79,14 @@ class Listener(BaseListener):
         self.imu_sub = self.create_subscription(IMU, '/peak_gps/imu', self.imu_callback, 10)
         self.control_sub = self.create_subscription(Twist, '/gazebo/cmd_vel', self.control_callback, 10)
     
+    def compute_bmu_distances(self, bmu):
+        diff = bmu - self.coords
+        d_sq = diff[:, 0]**2 + diff[:, 1]**2
+        d = np.sqrt(d_sq).reshape((X_OUT, Y_OUT))
+
+        self.distances = d
+
+    # TODO fix this! Don't use distance from input, use distance from BMU
     def compute_influence(self, x, y):
         theta = np.exp(-(self.distances[x, y]**2)/(2 * self.n_rad**2))
 
@@ -126,7 +138,6 @@ class Listener(BaseListener):
         results = np.sqrt(np.sum((self.w - cap)**2, axis=(2, 3)))
         # Get X-Y position of the node with the minimum distance
         bmu = np.unravel_index(np.argmin(results, axis = None), results.shape)
-        self.distances = np.copy(results)
 
         return bmu
 
