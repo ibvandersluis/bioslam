@@ -21,8 +21,8 @@ from gazebo_msgs.msg import LinkStates
 # Declare constants
 IN_MAX = 30 # Max input amount (i.e. max number of cones at once)
 IN_VECT = 2 # The number of input vectors
-X_OUT = 20 # X size of output layer
-Y_OUT = 20 # Y size of output layer
+X_OUT = 200 # X size of output layer
+Y_OUT = 200 # Y size of output layer
 SIGMA0 = max(X_OUT, Y_OUT)/2 # Radius of map at t0
 LAM = 500 # Lambda, the time scaling constant
 L0 = 0.3 # Initial learning rate
@@ -87,7 +87,7 @@ class Listener(BaseListener):
         self.t += 1 # Increment timestep
         print(bmu)
         print('Quantisation error: ' + str(self.quant_err()))
-        # self.plot_som()
+        self.plot_bmu(bmu)
 
     def get_bmu(self, x):
         """
@@ -146,16 +146,40 @@ class Listener(BaseListener):
         sigma_t = self.sigma(t)
         return np.exp(-(dist**2)/(2 * sigma_t**2))
 
+    def plot_bmu(self, bmu):
+        """
+        Plots the coordinates of the BMU
+
+        :param bmu: X-Y coordinates of the best matching unit
+        """
+        plt.cla()
+        # for stopping simulation with the esc key.
+        plt.gcf().canvas.mpl_connect(
+            'key_release_event', lambda event:
+            [exit(0) if event.key == 'escape' else None])
+        plt.plot(bmu[0], bmu[1], "*r", label='BMU')
+        plt.legend()
+        plt.xlim(0, X_OUT)
+        plt.ylim(0, Y_OUT)
+        plt.grid(True)
+        plt.pause(0.001)
+
     def plot_som(self):
         """
         Plots the SOM by taking x, y weights from the output layer
-        # Doesn't work
         """
+        plt.cla()
+        # for stopping simulation with the esc key.
+        plt.gcf().canvas.mpl_connect(
+            'key_release_event', lambda event:
+            [exit(0) if event.key == 'escape' else None])
         x, y = self.get_x_y()
-        plt.scatter(x, y, marker='.', c='k')
-        plt.show()
-        plt.pause(0.0001)
-        plt.clf()
+        plt.plot(x, y, ".k", label='nodes')
+        plt.legend()
+        plt.axis("equal")
+        plt.grid(True)
+        plt.pause(0.001)
+
     
     def quant_err(self):
         """
