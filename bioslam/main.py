@@ -15,8 +15,6 @@ from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point, Twist, Vector3
 from gazebo_msgs.msg import LinkStates
 
-# VERSION 1
-
 # Input: 2 input vectors, 1 for each of the x and y position values at a given timestep
 # Output: A 2x2 grid of nodes, each represented by a set of weights connected to each input
 
@@ -37,9 +35,9 @@ class Listener(BaseListener):
         self.t = 0 # Timestep (iteration count)
 
         # Initialise arrays
-        self.coords = np.indices((X_OUT, Y_OUT))
+        self.coords = np.indices((X_OUT, Y_OUT)) # An array of all coordinates for the output layer
         self.coords = np.flip(self.coords.T, axis=2).reshape((X_OUT * Y_OUT, 2))
-        self.diff = None # Difference between inputs and weights (capture - W)
+        self.diff = None # Difference between inputs and weights (x - w)
         self.bmu_dists = []
 
         # Initialize weights
@@ -120,6 +118,10 @@ class Listener(BaseListener):
         return bmu
 
     def get_x_y(self):
+        """
+        Collects x and y weights from the output layer for plotting
+        # Currently doesn't work
+        """
         x = self.w[:, :, :, 0].flatten()
         y = self.w[:, :, :, 1].flatten()
 
@@ -145,6 +147,10 @@ class Listener(BaseListener):
         return np.exp(-(dist**2)/(2 * sigma_t**2))
 
     def plot_som(self):
+        """
+        Plots the SOM by taking x, y weights from the output layer
+        # Doesn't work
+        """
         x, y = self.get_x_y()
         plt.scatter(x, y, marker='.', c='k')
         plt.show()
