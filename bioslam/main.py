@@ -21,11 +21,11 @@ from gazebo_msgs.msg import LinkStates
 # Declare constants
 IN_MAX = 30 # Max input amount (i.e. max number of cones at once)
 IN_VECT = 2 # The number of input vectors
-X_OUT = 200 # X size of output layer
-Y_OUT = 200 # Y size of output layer
+X_OUT = 40 # X size of output layer
+Y_OUT = 40 # Y size of output layer
 SIGMA0 = max(X_OUT, Y_OUT)/2 # Radius of map at t0
-LAM = 500 # Lambda, the time scaling constant
-L0 = 0.3 # Initial learning rate
+LAM = 5000 # Lambda, the time scaling constant
+L0 = 0.02 # Initial learning rate
 
 class Listener(BaseListener):
 
@@ -42,8 +42,6 @@ class Listener(BaseListener):
 
         # Initialize weights
         self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT)
-        norm = np.linalg.norm(self.w)
-        self.w /= norm # Normalise (? ask Alex)
 
         # Set publishers
         self.map_pub = self.create_publisher(ConeArray, '/mapping/map', 10)
