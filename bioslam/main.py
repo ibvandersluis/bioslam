@@ -113,10 +113,9 @@ class Listener(BaseListener):
     def get_x_y(self):
         """
         Collects x and y weights from the output layer for plotting
-        # Currently doesn't work
         """
-        x = self.w[:, :, :, 0].flatten()
-        y = self.w[:, :, :, 1].flatten()
+        x = self.w2[:, :, 0].flatten()
+        y = self.w2[:, :, 1].flatten()
 
         return x, y
 
