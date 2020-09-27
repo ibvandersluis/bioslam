@@ -75,16 +75,23 @@ class Listener(BaseListener):
         # Pad capture array with zeros for give it a shape of (1, 1, IN_MAX, IN_VECT)
         x = np.vstack((x, np.zeros((30 - len(x[:, 0]), IN_VECT)))).reshape((1, 1, IN_MAX, IN_VECT))
         
-        bmu = self.get_bmu(x, self.w) # Determine BMU coordinates
+        bmu = self.get_bmu(x, self.w) # Determine BMU coordinates for first layer
         
         dist = self.compute_bmu_distances(bmu) # Calculate distance from each node to BMU
         
         self.w = self.update(self.w, dist, t) # Compute weights of neighbourhood nodes
+
+        # Run 2nd layer with first layer BMU
+        bmu = self.get_bmu(bmu, self.w2)
+
+        dist = self.compute_bmu_distances(bmu)
+
+        self.w2 = self.update(self.w2, dist, t)
         
         self.t += 1 # Increment timestep
         print(bmu)
         print('Quantisation error: ' + str(self.quant_err()))
-        self.plot_bmu(bmu)
+        self.plot_som()
 
     def get_bmu(self, x, w):
         """
@@ -209,7 +216,7 @@ class Listener(BaseListener):
             Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1, 1))
         elif (w.ndim == 3):
             Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1))
-            
+
         w += Ndt * self.L(t) * self.diff
 
         return w
