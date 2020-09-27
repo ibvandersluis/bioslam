@@ -79,7 +79,7 @@ class Listener(BaseListener):
         
         dist = self.compute_bmu_distances(bmu) # Calculate distance from each node to BMU
         
-        self.update(dist, t) # Compute weights of neighbourhood nodes
+        self.w = self.update(self.w, dist, t) # Compute weights of neighbourhood nodes
         
         self.t += 1 # Increment timestep
         print(bmu)
@@ -196,15 +196,24 @@ class Listener(BaseListener):
         """
         return SIGMA0 * np.exp(-t/LAM)
 
-    def update(self, dist, t):
+    def update(self, w, dist, t):
         """
         Calculates new weights for the SOM
 
+        :param w: The weights array to be updated
         :param dist: The array of distances for each node from the BMU
         :param t: The given timestep
+        :return: The updated weights array
         """
-        Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1, 1))
-        self.w += Ndt * self.L(t) * self.diff
+        if (w.ndim == 4):
+            Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1, 1))
+        elif (w.ndim == 3):
+            Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1))
+            
+        w += Ndt * self.L(t) * self.diff
+
+        return w
+
 
 def main(args=None):
     rclpy.init(args=args)
