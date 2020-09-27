@@ -82,7 +82,7 @@ class Listener(BaseListener):
         self.w = self.update(self.w, dist, t) # Compute weights of neighbourhood nodes
 
         # Run 2nd layer with first layer BMU
-        bmu = self.get_bmu(bmu, self.w2)
+        bmu = self.get_bmu(np.array(bmu), self.w2)
 
         dist = self.compute_bmu_distances(bmu)
 
@@ -104,15 +104,15 @@ class Listener(BaseListener):
         self.diff = x - w # Calculate differences
         
         # Calculate distances between the input and each node
-        if (x.ndim == 4):
+        if (w.ndim == 4):
             results = np.sqrt(np.sum((w - x)**2, axis=(2, 3)))
-        elif (x.ndim == 3):
+        elif (w.ndim == 3):
             results = np.sqrt(np.sum((w - x)**2, axis=2))
         
         # Get X-Y position of the node with the minimum distance
         bmu = np.unravel_index(np.argmin(results, axis = None), results.shape)
         
-        if (x.ndim == 3):
+        if (w.ndim == 3):
             self.bmu_dists.append(np.linalg.norm(self.diff[bmu]))
 
         return bmu
