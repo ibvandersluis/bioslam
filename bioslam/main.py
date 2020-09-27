@@ -41,7 +41,10 @@ class Listener(BaseListener):
         self.bmu_dists = []
 
         # Initialize weights
+        # First layer takes observed cones as input
         self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT)
+        # Second layer takes BMU of first layer as input
+        self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT)
 
         # Set publishers
         self.map_pub = self.create_publisher(ConeArray, '/mapping/map', 10)
@@ -69,49 +72,41 @@ class Listener(BaseListener):
             return
         # Place x y positions of cones into input array x
         x = np.array([[cone.x, cone.y] for cone in msg.cones])
-        # Pad capture array with zeros for give it a shape of (IN_MAX, IN_VECT)
-        x = np.vstack((x, np.zeros((30 - len(x[:, 0]), IN_VECT))))
-        a = time.time()
-        bmu = self.get_bmu(x) # Determine BMU coordinates
-        b = time.time()
+        # Pad capture array with zeros for give it a shape of (1, 1, IN_MAX, IN_VECT)
+        x = np.vstack((x, np.zeros((30 - len(x[:, 0]), IN_VECT)))).reshape((1, 1, IN_MAX, IN_VECT))
+        
+        bmu = self.get_bmu(x, self.w) # Determine BMU coordinates
+        
         dist = self.compute_bmu_distances(bmu) # Calculate distance from each node to BMU
-        c = time.time()
+        
         self.update(dist, t) # Compute weights of neighbourhood nodes
-        d = time.time()
-        print('get bmu: ' + str(b-a))
-        print('compute dist: ' + str(c-b))
-        print('compute weight: ' + str(d-c))
-        print('t: ' + str(t), '\nlambda: ' + str(self.L(t)), '\nrad: ' + str(self.sigma(t)))
+        
         self.t += 1 # Increment timestep
         print(bmu)
         print('Quantisation error: ' + str(self.quant_err()))
         self.plot_bmu(bmu)
 
-    def get_bmu(self, x):
+    def get_bmu(self, x, w):
         """
-        Determines the X-Y position of the winning node in the output layer
+        Determines the X-Y position of the winning node in the first layer
 
-        :param x: The input array
+        :param x: The input array. Must match dimensionality of w array
+        :param w: The weights
         :return: bmu, the coordinates of the best matching unit
-        """
-        # Make self.capture 4D
-        j = time.time()
-        cap = np.zeros((1, 1, IN_MAX, IN_VECT))
-        cap += x
-        k = time.time()
-        self.diff = cap - self.w # Calculate differences
-        l = time.time()
+        """        
+        self.diff = x - w # Calculate differences
+        
         # Calculate distances between the input and each node
-        results = np.sqrt(np.sum((self.w - cap)**2, axis=(2, 3)))
-        m = time.time()
+        if (x.ndim == 4):
+            results = np.sqrt(np.sum((w - x)**2, axis=(2, 3)))
+        elif (x.ndim == 3):
+            results = np.sqrt(np.sum((w - x)**2, axis=2))
+        
         # Get X-Y position of the node with the minimum distance
         bmu = np.unravel_index(np.argmin(results, axis = None), results.shape)
-        n = time.time()
-        self.bmu_dists.append(np.linalg.norm(self.diff[bmu]))
-        print('make 4d: ' + str(k-j))
-        print('diff: ' + str(l-k))
-        print('results: ' + str(m-l))
-        print('bmu: ' + str(n-m))
+        
+        if (x.ndim == 3):
+            self.bmu_dists.append(np.linalg.norm(self.diff[bmu]))
 
         return bmu
 
