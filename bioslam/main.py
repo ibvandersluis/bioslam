@@ -70,16 +70,14 @@ class Listener(BaseListener):
         t = self.t
         if (self.sigma(t) < 1):
             return
-        # Place x y positions of cones into input array x
-        x = np.array([[cone.x, cone.y] for cone in msg.cones])
-        # Pad capture array with zeros for give it a shape of (1, 1, IN_MAX, IN_VECT)
-        x = np.vstack((x, np.zeros((30 - len(x[:, 0]), IN_VECT)))).reshape((1, 1, IN_MAX, IN_VECT))
+        # Place x y positions of cones into input array x and reshape as 4D
+        x = np.array([[cone.x, cone.y] for cone in msg.cones]).reshape((1, 1, len(msg.cones), IN_VECT))
         
         bmu = self.get_bmu(x, self.w) # Determine BMU coordinates for first layer
         
         dist = self.compute_bmu_distances(bmu) # Calculate distance from each node to BMU
         
-        self.w = self.update(self.w, dist, t) # Compute weights of neighbourhood nodes
+        self.w[:, :, 0:x.shape[2], :] = self.update(self.w, dist, t) # Compute weights of neighbourhood nodes
 
         # Run 2nd layer with first layer BMU
         bmu = self.get_bmu(np.array(bmu), self.w2)
@@ -101,13 +99,14 @@ class Listener(BaseListener):
         :param w: The weights
         :return: bmu, the coordinates of the best matching unit
         """        
-        self.diff = x - w # Calculate differences
-        
         # Calculate distances between the input and each node
         if (w.ndim == 4):
+            w = w[:, :, 0:x.shape[2], :] # Mask w to include only weights matching observed cones
             results = np.sqrt(np.sum((w - x)**2, axis=(2, 3)))
         elif (w.ndim == 3):
             results = np.sqrt(np.sum((w - x)**2, axis=2))
+
+        self.diff = x - w # Calculate differences
         
         # Get X-Y position of the node with the minimum distance
         bmu = np.unravel_index(np.argmin(results, axis = None), results.shape)
@@ -212,7 +211,9 @@ class Listener(BaseListener):
         :param t: The given timestep
         :return: The updated weights array
         """
+
         if (w.ndim == 4):
+            w = w[:, :, 0:self.diff.shape[2], :]
             Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1, 1))
         elif (w.ndim == 3):
             Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1))
