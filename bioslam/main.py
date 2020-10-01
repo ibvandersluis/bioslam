@@ -42,9 +42,9 @@ class Listener(BaseListener):
 
         # Initialize weights
         # First layer takes observed cones as input
-        self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT)
+        self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT) * 7
         # Second layer takes BMU of first layer as input
-        self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT)
+        self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT) * X_OUT
 
         # Set publishers
         self.map_pub = self.create_publisher(ConeArray, '/mapping/map', 10)
