@@ -24,8 +24,8 @@ IN_VECT = 2 # The number of input vectors
 X_OUT = 40 # X size of output layer
 Y_OUT = 40 # Y size of output layer
 SIGMA0 = max(X_OUT, Y_OUT)/2 # Radius of map at t0
-LAM = 5000 # Lambda, the time scaling constant
-L0 = 0.02 # Initial learning rate
+LAM = 140 # Lambda, the time scaling constant
+L0 = 0.3 # Initial learning rate
 
 class Listener(BaseListener):
 
@@ -219,6 +219,7 @@ class Listener(BaseListener):
             Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1))
 
         w += Ndt * self.L(t) * self.diff
+        print("L: " + str(self.L(t)))
 
         return w
 
