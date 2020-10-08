@@ -15,6 +15,8 @@ from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point, Twist, Vector3
 from gazebo_msgs.msg import LinkStates
 
+np.set_printoptions(threshold=sys.maxsize)
+
 # Input: 2 input vectors, 1 for each of the x and y position values at a given timestep
 # Output: A 2x2 grid of nodes, each represented by a set of weights connected to each input
 
@@ -26,6 +28,7 @@ Y_OUT = 40 # Y size of output layer
 SIGMA0 = max(X_OUT, Y_OUT)/2 # Radius of map at t0
 LAM = 140 # Lambda, the time scaling constant
 L0 = 0.3 # Initial learning rate
+PLOTTING = False
 
 class Listener(BaseListener):
 
@@ -45,6 +48,12 @@ class Listener(BaseListener):
         self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT) * [15, 5]
         # Second layer takes BMU of first layer as input
         self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT) * [X_OUT, Y_OUT]
+        
+        # Timers
+        self.start = self.get_clock().now().nanoseconds
+        self.timer_last = self.get_clock().now().nanoseconds
+        self.dt = []
+        self.elapsed = []
 
         # Set publishers
         self.map_pub = self.create_publisher(ConeArray, '/mapping/map', 10)
@@ -67,6 +76,14 @@ class Listener(BaseListener):
         return d
 
     def cones_callback(self, msg: ConeArray):
+        # Calculate time values
+        cur_time = self.get_clock().now().nanoseconds
+        T = (cur_time - self.start)/1000000000
+        DT = (cur_time - self.timer_last)/1000000000
+        self.timer_last = cur_time # Set timer_last as current nanoseconds
+        self.elapsed.append(T)
+        self.dt.append(DT)
+
         t = self.t
         if (self.sigma(t) < 1):
             return
@@ -89,7 +106,10 @@ class Listener(BaseListener):
         self.t += 1 # Increment timestep
         print(bmu)
         print('Quantisation error: ' + str(self.quant_err()))
-        self.plot_som()
+        print(np.array((self.dt, self.elapsed)).T)
+        print(self.sigma(t))
+        if(PLOTTING):
+            self.plot_som()
 
     def get_bmu(self, x, w):
         """
