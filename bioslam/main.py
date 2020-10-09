@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 
 import message_filters
@@ -29,11 +30,20 @@ SIGMA0 = max(X_OUT, Y_OUT)/2 # Radius of map at t0
 LAM = 140 # Lambda, the time scaling constant
 L0 = 0.3 # Initial learning rate
 PLOTTING = False
+DEBUGGING = False
 
 class Listener(BaseListener):
 
     def __init__(self):
         super().__init__('bioslam')
+
+        if(DEBUGGING):
+            self.debug = 0
+            self.path = os.getcwd() + '/bioslam_debug'
+            try:
+                os.mkdir(self.path)
+            except:
+                pass
 
         self.t = 0 # Timestep (iteration count)
 
@@ -49,18 +59,18 @@ class Listener(BaseListener):
         # Second layer takes BMU of first layer as input
         self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT) * [X_OUT, Y_OUT]
         
-        # Timers
-        self.start = self.get_clock().now().nanoseconds
-        self.timer_last = self.get_clock().now().nanoseconds
-        self.dt = []
-        self.elapsed = []
-
         # Set publishers
         self.map_pub = self.create_publisher(ConeArray, '/mapping/map', 10)
         self.pose_pub = self.create_publisher(CarPos, '/mapping/position', 10)
 
         # Set subscribers
         self.cones_sub = self.create_subscription(ConeArray, '/cones/positions', self.cones_callback, 10)
+        
+        # Timers
+        self.dt = []
+        self.elapsed = []
+        self.start = self.get_clock().now().nanoseconds
+        self.timer_last = self.get_clock().now().nanoseconds
     
     def compute_bmu_distances(self, bmu):
         """
@@ -106,10 +116,16 @@ class Listener(BaseListener):
         self.t += 1 # Increment timestep
         print(bmu)
         print('Quantisation error: ' + str(self.quant_err()))
-        print(np.array((self.dt, self.elapsed)).T)
         print(self.sigma(t))
         if(PLOTTING):
             self.plot_som()
+        if(DEBUGGING):
+            self.debug += 1
+            file = 'debug' + str(self.debug) + '.txt'
+            f = open(self.path + '/' + file, 'w')
+            f.write('Time complexity:\n')
+            f.write(str(np.array((self.dt, self.elapsed)).T))
+            f.close()
 
     def get_bmu(self, x, w):
         """
