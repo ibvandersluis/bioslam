@@ -29,7 +29,7 @@ Y_OUT = 40 # Y size of output layer
 SIGMA0 = max(X_OUT, Y_OUT)/2 # Radius of map at t0
 LAM = 140 # Lambda, the time scaling constant
 L0 = 0.3 # Initial learning rate
-PLOTTING = False
+PLOTTING = True
 DEBUGGING = False
 
 class Listener(BaseListener):
