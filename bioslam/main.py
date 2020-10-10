@@ -18,8 +18,10 @@ from gazebo_msgs.msg import LinkStates
 
 np.set_printoptions(threshold=sys.maxsize)
 
-# Input: 2 input vectors, 1 for each of the x and y position values at a given timestep
-# Output: A 2x2 grid of nodes, each represented by a set of weights connected to each input
+# Input: 2 input vectors
+#   1 for each of the x and y position values at a given timestep
+# Output: A 2x2 grid of nodes
+#   each represented by a set of weights connected to each input
 
 # Declare constants
 IN_MAX = 30 # Max input amount (i.e. max number of cones at once)
@@ -48,8 +50,8 @@ class Listener(BaseListener):
         self.t = 0 # Timestep (iteration count)
 
         # Initialise arrays
-        self.coords = np.indices((X_OUT, Y_OUT)) # An array of all coordinates for the output layer
-        self.coords = np.flip(self.coords.T, axis=2).reshape((X_OUT * Y_OUT, 2))
+        self.coords = np.indices((X_OUT, Y_OUT)) # An array of all unit coords
+        self.coords = np.flip(self.coords.T, axis=2).reshape((X_OUT*Y_OUT, 2))
         self.diff = None # Difference between inputs and weights (x - w)
         self.bmu_dists = []
 
@@ -58,13 +60,10 @@ class Listener(BaseListener):
         self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT) * [15, 5]
         # Second layer takes BMU of first layer as input
         self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT) * [X_OUT, Y_OUT]
-        
-        # Set publishers
-        self.map_pub = self.create_publisher(ConeArray, '/mapping/map', 10)
-        self.pose_pub = self.create_publisher(CarPos, '/mapping/position', 10)
 
         # Set subscribers
-        self.cones_sub = self.create_subscription(ConeArray, '/cones/positions', self.cones_callback, 10)
+        self.cones_sub = self.create_subscription(ConeArray,
+            '/cones/positions', self.cones_callback, 10)
         
         # Timers
         self.dt = []
@@ -74,10 +73,12 @@ class Listener(BaseListener):
     
     def compute_bmu_distances(self, bmu):
         """
-        Calculates the Euclidian distance between all output nodes and the BMU
+        Calculates the Euclidian distance between all
+            output nodes and the BMU
 
         :param bmu: The coordinates of the BMU on the output layer
-        :return: d, a matrix of distances corresponding to node coordinates
+        :return: d, a matrix of distances corresponding to node
+                 coordinates
         """
         diff = bmu - self.coords
         d_sq = diff[:, 0]**2 + diff[:, 1]**2
@@ -90,7 +91,7 @@ class Listener(BaseListener):
         cur_time = self.get_clock().now().nanoseconds
         T = (cur_time - self.start)/1000000000
         DT = (cur_time - self.timer_last)/1000000000
-        self.timer_last = cur_time # Set timer_last as current nanoseconds
+        self.timer_last = cur_time
         self.elapsed.append(T)
         self.dt.append(DT)
 
@@ -98,13 +99,15 @@ class Listener(BaseListener):
         if (self.sigma(t) < 1):
             return
         # Place x y positions of cones into input array x and reshape as 4D
-        x = np.array([[cone.x, cone.y] for cone in msg.cones]).reshape((1, 1, len(msg.cones), IN_VECT))
+        x = np.array([[cone.x, cone.y] for cone
+                        in msg.cones]).reshape((1, 1, len(msg.cones), IN_VECT))
         
-        bmu = self.get_bmu(x, self.w) # Determine BMU coordinates for first layer
+        bmu = self.get_bmu(x, self.w) # First layer BMU coordinates
         
-        dist = self.compute_bmu_distances(bmu) # Calculate distance from each node to BMU
+        dist = self.compute_bmu_distances(bmu)
         
-        self.w[:, :, 0:x.shape[2], :] = self.update(self.w, dist, t) # Compute weights of neighbourhood nodes
+        # Compute weights of neighbourhood nodes
+        self.w[:, :, 0:x.shape[2], :] = self.update(self.w, dist, t)
 
         # Run 2nd layer with first layer BMU
         bmu = self.get_bmu(np.array(bmu), self.w2)
@@ -137,7 +140,7 @@ class Listener(BaseListener):
         """        
         # Calculate distances between the input and each node
         if (w.ndim == 4):
-            w = w[:, :, 0:x.shape[2], :] # Mask w to include only weights matching observed cones
+            w = w[:, :, 0:x.shape[2], :] # Apply mask to w
             results = np.sqrt(np.sum((w - x)**2, axis=(2, 3)))
         elif (w.ndim == 3):
             results = np.sqrt(np.sum((w - x)**2, axis=2))
@@ -174,7 +177,8 @@ class Listener(BaseListener):
         """
         Computes the neighbouring penalty N
 
-        :param dist: An array of distances to the BMU, matching the shape of the output layer
+        :param dist: An array of distances to the BMU, matching output
+                     layer shape
         :param t: The given timestep
         """
         sigma_t = self.sigma(t)
@@ -223,7 +227,8 @@ class Listener(BaseListener):
     
     def quant_err(self):
         """
-        Measures the quantisation error, the average difference between the input and the BMU
+        Measures the quantisation error, the average difference between the
+            input and the BMU (output layer)
 
         :return: The quantisation error
         """
