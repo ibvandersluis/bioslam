@@ -20,8 +20,10 @@ np.set_printoptions(threshold=sys.maxsize)
 
 # Input: 2 input vectors
 #   1 for each of the x and y position values at a given timestep
-# Output: A 2x2 grid of nodes
-#   each represented by a set of weights connected to each input
+# First layer: A (X_OUT x Y_OUT) point latice
+#   each represented by a set of weights connected to each input. Outputs BMU
+# Output layer: A (X_OUT x Y_OUT) point latice taking 1st-layer BMU as input
+#   each unit has weights [x, y] to match the values of the input
 
 # Declare constants
 IN_MAX = 30 # Max input amount (i.e. max number of cones at once)
@@ -33,6 +35,39 @@ LAM = 140 # Lambda, the time scaling constant
 L0 = 0.3 # Initial learning rate
 PLOTTING = True
 DEBUGGING = False
+
+def L(t):
+    """
+    Calculates the learning rate for the given timestep. The radius decays
+    gradually as the network continues to train.
+
+    :param t: The given timestep
+    :return: L(t)
+    """
+    return L0 * np.exp(-t/LAM)
+
+def sigma(t):
+    """
+    Calculates sigma(t), the neighbourhood radius for the given timestep. The
+    radius decays gradually as the network continues to train.
+
+    :param t: The given timestep
+    :return: sigma(t)
+    """
+    return SIGMA0 * np.exp(-t/LAM)
+
+def theta(dist, t):
+    """
+    Computes the neighbouring penalty theta. This gaussian decay function
+    causes unite near the BMU to be updated strongly, while units near the
+    edge of the neighbourhood are hardly changed.
+
+    :param dist: An array of distances to the BMU, matching output layer shape
+    :param t: The given timestep
+    :return: theta(d, t)
+    """
+    sigma_t = sigma(t)
+    return np.exp(-(dist**2)/(2 * sigma_t**2))
 
 class Listener(BaseListener):
 
@@ -57,7 +92,7 @@ class Listener(BaseListener):
 
         # Initialize weights
         # First layer takes observed cones as input
-        self.w = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT) * [15, 5]
+        self.w1 = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT) * [15, 5]
         # Second layer takes BMU of first layer as input
         self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT) * [X_OUT, Y_OUT]
 
@@ -73,12 +108,10 @@ class Listener(BaseListener):
     
     def compute_bmu_distances(self, bmu):
         """
-        Calculates the Euclidian distance between all
-            output nodes and the BMU
+        Calculates the Euclidian distance between all output nodes and the BMU
 
         :param bmu: The coordinates of the BMU on the output layer
-        :return: d, a matrix of distances corresponding to node
-                 coordinates
+        :return: d, a matrix of distances corresponding to node coordinates
         """
         diff = bmu - self.coords
         d_sq = diff[:, 0]**2 + diff[:, 1]**2
@@ -96,18 +129,18 @@ class Listener(BaseListener):
         self.dt.append(DT)
 
         t = self.t
-        if (self.sigma(t) < 1):
+        if (sigma(t) < 1):
             return
         # Place x y positions of cones into input array x and reshape as 4D
         x = np.array([[cone.x, cone.y] for cone
                         in msg.cones]).reshape((1, 1, len(msg.cones), IN_VECT))
         
-        bmu = self.get_bmu(x, self.w) # First layer BMU coordinates
+        bmu = self.get_bmu(x, self.w1) # First layer BMU coordinates
         
         dist = self.compute_bmu_distances(bmu)
         
         # Compute weights of neighbourhood nodes
-        self.w[:, :, 0:x.shape[2], :] = self.update(self.w, dist, t)
+        self.w1[:, :, 0:x.shape[2], :] = self.update(self.w1, dist, t)
 
         # Run 2nd layer with first layer BMU
         bmu = self.get_bmu(np.array(bmu), self.w2)
@@ -119,7 +152,7 @@ class Listener(BaseListener):
         self.t += 1 # Increment timestep
         print(bmu)
         print('Quantisation error: ' + str(self.quant_err()))
-        print(self.sigma(t))
+        print(sigma(t))
         if(PLOTTING):
             self.plot_som()
         if(DEBUGGING):
@@ -164,26 +197,6 @@ class Listener(BaseListener):
 
         return x, y
 
-    def L(self, t):
-        """
-        Calculates the learning rate for the given timestep
-
-        :param t: The given timestep
-        :return: Lt
-        """
-        return L0 * np.exp(-t/LAM)
-
-    def N(self, dist, t):
-        """
-        Computes the neighbouring penalty N
-
-        :param dist: An array of distances to the BMU, matching output
-                     layer shape
-        :param t: The given timestep
-        """
-        sigma_t = self.sigma(t)
-        return np.exp(-(dist**2)/(2 * sigma_t**2))
-
     def plot_bmu(self, bmu):
         """
         Plots the coordinates of the BMU
@@ -223,25 +236,15 @@ class Listener(BaseListener):
         plt.axis("equal")
         plt.grid(True)
         plt.pause(0.001)
-
     
     def quant_err(self):
         """
         Measures the quantisation error, the average difference between the
-            input and the BMU (output layer)
+        input and the BMU (output layer)
 
         :return: The quantisation error
         """
         return np.array(self.bmu_dists).mean()
-    
-    def sigma(self, t):
-        """
-        Calculates sigma(t), the neighbourhood radius for the given timestep
-
-        :param t: The given timestep
-        :return: sigma(t)
-        """
-        return SIGMA0 * np.exp(-t/LAM)
 
     def update(self, w, dist, t):
         """
@@ -255,12 +258,11 @@ class Listener(BaseListener):
 
         if (w.ndim == 4):
             w = w[:, :, 0:self.diff.shape[2], :]
-            Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1, 1))
+            theta_dt = theta(dist, t).reshape((X_OUT, Y_OUT, 1, 1))
         elif (w.ndim == 3):
-            Ndt = self.N(dist, t).reshape((X_OUT, Y_OUT, 1))
+            theta_dt = theta(dist, t).reshape((X_OUT, Y_OUT, 1))
 
-        w += Ndt * self.L(t) * self.diff
-        print("L: " + str(self.L(t)))
+        w += theta_dt * L(t) * self.diff
 
         return w
 
