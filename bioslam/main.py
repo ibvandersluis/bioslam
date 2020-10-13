@@ -66,8 +66,8 @@ def theta(dist, t):
     :param t: The given timestep
     :return: theta(d, t)
     """
-    sigma_t = sigma(t)
-    return np.exp(-(dist**2)/(2 * sigma_t**2))
+    # sigma_t = sigma(t)
+    return np.exp(-(dist**2)/(2 * sigma(t)**2))
 
 class Listener(BaseListener):
 
@@ -154,7 +154,7 @@ class Listener(BaseListener):
         print('Quantisation error: ' + str(self.quant_err()))
         print(sigma(t))
         if(PLOTTING):
-            self.plot_som()
+            self.plot_som(bmu)
         if(DEBUGGING):
             self.debug += 1
             file = 'debug' + str(self.debug) + '.txt'
@@ -218,9 +218,11 @@ class Listener(BaseListener):
         plt.grid(True)
         plt.pause(0.001)
 
-    def plot_som(self):
+    def plot_som(self, bmu = None):
         """
         Plots the SOM by taking x, y weights from the output layer
+
+        :param bmu: If supplied, highlights this unit in red.
         """
         plt.cla()
         # for stopping simulation with the esc key.
@@ -228,7 +230,9 @@ class Listener(BaseListener):
             'key_release_event', lambda event:
             [exit(0) if event.key == 'escape' else None])
         x, y = self.get_x_y()
-        plt.plot(x, y, ".k", label='nodes')
+        plt.plot(x, y, ".k", label='Units')
+        if (bmu):
+            plt.plot(self.w2[bmu][0], self.w2[bmu][1], "*r", label='BMU')
         plt.legend()
         plt.title('BioSLAM: SOM')
         plt.xlabel('X Weights')
