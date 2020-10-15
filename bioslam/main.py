@@ -30,6 +30,7 @@ IN_MAX = 30 # Max input amount (i.e. max number of cones at once)
 IN_VECT = 2 # The number of input vectors
 X_OUT = 40 # X size of output layer
 Y_OUT = 40 # Y size of output layer
+THRESHOLD = 0.5 # Threshold for Sigma to stop training
 SIGMA0 = max(X_OUT, Y_OUT)/2 # Radius of map at t0
 LAM = 140 # Lambda, the time scaling constant
 L0 = 0.3 # Initial learning rate
@@ -92,7 +93,8 @@ class Listener(BaseListener):
 
         # Initialize weights
         # First layer takes observed cones as input
-        self.w1 = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT) * [15, 5]
+        self.w1 = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT)
+        self.w1 = self.w1 * [10.0, 15.0] - [5.0, 0.0]
         # Second layer takes BMU of first layer as input
         self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT) * [X_OUT, Y_OUT]
 
@@ -129,7 +131,8 @@ class Listener(BaseListener):
         self.dt.append(DT)
 
         t = self.t
-        if (sigma(t) < 1):
+        if (sigma(t) < THRESHOLD):
+            print('Training complete')
             return
         # Place x y positions of cones into input array x and reshape as 4D
         x = np.array([[cone.x, cone.y] for cone
@@ -152,9 +155,9 @@ class Listener(BaseListener):
         self.t += 1 # Increment timestep
         print(bmu)
         print('Quantisation error: ' + str(self.quant_err()))
-        print(sigma(t))
+        print('Radius: ' + str(sigma(t)))
         if(PLOTTING):
-            self.plot_som(bmu)
+            self.plot_som()
         if(DEBUGGING):
             self.debug += 1
             file = 'debug' + str(self.debug) + '.txt'
@@ -167,16 +170,17 @@ class Listener(BaseListener):
         """
         Determines the X-Y position of the winning node in the first layer
 
-        :param x: The input array. Must match dimensionality of w array
+        :param x: The input array (relative x-y pos of visible cones)
         :param w: The weights
         :return: bmu, the coordinates of the best matching unit
         """        
         # Calculate distances between the input and each node
+
         if (w.ndim == 4):
             w = w[:, :, 0:x.shape[2], :] # Apply mask to w
-            results = np.sqrt(np.sum((w - x)**2, axis=(2, 3)))
+            results = np.sqrt(np.sum((w - x) * (w - x), axis=(2, 3)))
         elif (w.ndim == 3):
-            results = np.sqrt(np.sum((w - x)**2, axis=2))
+            results = np.sqrt(np.sum((w - x) * (w - x), axis=2))
 
         self.diff = x - w # Calculate differences
         
