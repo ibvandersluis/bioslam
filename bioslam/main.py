@@ -30,7 +30,7 @@ IN_MAX = 30 # Max input amount (i.e. max number of cones at once)
 IN_VECT = 2 # The number of input vectors
 X_OUT = 40 # X size of output layer
 Y_OUT = 40 # Y size of output layer
-THRESHOLD = 0.5 # Threshold for Sigma to stop training
+THRESHOLD = 1.0 # Threshold for Sigma to stop training
 SIGMA0 = max(X_OUT, Y_OUT)/2 # Radius of map at t0
 LAM = 140 # Lambda, the time scaling constant
 L0 = 0.3 # Initial learning rate
@@ -133,6 +133,8 @@ class Listener(BaseListener):
         t = self.t
         if (sigma(t) < THRESHOLD):
             print('Training complete')
+            if(PLOTTING):
+                self.plot_som()
             return
         # Place x y positions of cones into input array x and reshape as 4D
         x = np.array([[cone.x, cone.y] for cone
