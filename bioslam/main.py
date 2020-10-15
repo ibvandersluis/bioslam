@@ -103,8 +103,9 @@ class Listener(BaseListener):
             '/cones/positions', self.cones_callback, 10)
         
         # Timers
-        self.dt = []
         self.elapsed = []
+        self.dt = []
+        self.input_size = []
         self.start = self.get_clock().now().nanoseconds
         self.timer_last = self.get_clock().now().nanoseconds
     
@@ -139,6 +140,8 @@ class Listener(BaseListener):
         # Place x y positions of cones into input array x and reshape as 4D
         x = np.array([[cone.x, cone.y] for cone
                         in msg.cones]).reshape((1, 1, len(msg.cones), IN_VECT))
+
+        self.input_size.append(x.shape[2])
         
         bmu = self.get_bmu(x, self.w1) # First layer BMU coordinates
         
@@ -165,7 +168,7 @@ class Listener(BaseListener):
             file = 'debug' + str(self.debug) + '.txt'
             f = open(self.path + '/' + file, 'w')
             f.write('Time complexity:\n')
-            f.write(str(np.array((self.dt, self.elapsed)).T))
+            f.write(str(np.array((self.elapsed, self.dt, self.input_size)).T))
             f.close()
 
     def get_bmu(self, x, w):
