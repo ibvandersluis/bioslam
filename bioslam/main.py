@@ -94,7 +94,7 @@ class Listener(BaseListener):
         # Initialize weights
         # First layer takes observed cones as input
         self.w1 = np.random.rand(X_OUT, Y_OUT, IN_MAX, IN_VECT)
-        self.w1 = self.w1 * [10.0, 15.0] - [5.0, 0.0]
+        self.w1 = self.w1 * [10.0, 15.0] - [5.0, 0.0] # x [-5, 5], y [0, 15]
         # Second layer takes BMU of first layer as input
         self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT) * [X_OUT, Y_OUT]
 
@@ -181,10 +181,10 @@ class Listener(BaseListener):
         """        
         # Calculate distances between the input and each node
 
-        if (w.ndim == 4):
+        if (w.ndim == 4): # If first layer
             w = w[:, :, 0:x.shape[2], :] # Apply mask to w
             results = np.sqrt(np.sum((w - x) * (w - x), axis=(2, 3)))
-        elif (w.ndim == 3):
+        elif (w.ndim == 3): # If second layer
             results = np.sqrt(np.sum((w - x) * (w - x), axis=2))
 
         self.diff = x - w # Calculate differences
