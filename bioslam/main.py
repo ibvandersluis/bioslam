@@ -97,6 +97,7 @@ class Listener(BaseListener):
         self.w1 = self.w1 * [10.0, 15.0] - [5.0, 0.0] # x [-5, 5], y [0, 15]
         # Second layer takes BMU of first layer as input
         self.w2 = np.random.rand(X_OUT, Y_OUT, IN_VECT) * [X_OUT, Y_OUT]
+        self.nw = None
 
         # Set subscribers
         self.cones_sub = self.create_subscription(ConeArray,
@@ -138,31 +139,35 @@ class Listener(BaseListener):
                 self.plot_som()
             return
         # Place x y positions of cones into input array x and reshape as 4D
-        x = np.array([[cone.x, cone.y] for cone
-                        in msg.cones]).reshape((1, 1, len(msg.cones), IN_VECT))
+        x = np.array([[[cone.x, cone.y]]*IN_MAX for cone in msg.cones]) 
+        # x = np.array([[cone.x, cone.y] for cone
+        #                 in msg.cones]).reshape((1, 1, len(msg.cones), IN_VECT))
 
-        self.input_size.append(x.shape[2])
+        # self.input_size.append(x.shape[2])
+
+        print(x)
         
-        bmu = self.get_bmu(x, self.w1) # First layer BMU coordinates
+        bmu1 = self.get_bmu(x, self.w1) # First layer BMU coordinates
         
-        dist = self.compute_bmu_distances(bmu)
+        dist = self.compute_bmu_distances(bmu1)
         
         # Compute weights of neighbourhood nodes
-        self.w1[:, :, 0:x.shape[2], :] = self.update(self.w1, dist, t)
+        # self.w1[:, :, 0:x.shape[2], :] = self.update(self.w1, dist, t)
+        self.w1 = self.update(self.w1, dist, t)
 
         # Run 2nd layer with first layer BMU
-        bmu = self.get_bmu(np.array(bmu), self.w2)
+        bmu2 = self.get_bmu(np.array(bmu1), self.w2)
 
-        dist = self.compute_bmu_distances(bmu)
+        dist = self.compute_bmu_distances(bmu2)
 
         self.w2 = self.update(self.w2, dist, t)
         
         self.t += 1 # Increment timestep
-        print(bmu)
+        print(bmu2)
         print('Quantisation error: ' + str(self.quant_err()))
         print('Radius: ' + str(sigma(t)))
         if(PLOTTING):
-            self.plot_som()
+            self.plot_som(bmu=bmu2)
         if(DEBUGGING):
             self.debug += 1
             file = 'debug' + str(self.debug) + '.txt'
@@ -182,12 +187,25 @@ class Listener(BaseListener):
         # Calculate distances between the input and each node
 
         if (w.ndim == 4): # If first layer
-            w = w[:, :, 0:x.shape[2], :] # Apply mask to w
-            results = np.sqrt(np.sum((w - x) * (w - x), axis=(2, 3)))
+            self.nw = np.zeros_like(x)
+            indices = np.zeros((x.shape[0], 2), dtype=int)
+            row = 0
+            for (dim_x, dim_y) in ((obs[0],obs[1]) for obs in x[:,0]):
+                xr = max(min(round(5+dim_x)*4,39),0)
+                yr = max(min(round(8/3*dim_y),39),0)
+                indices[row] = (xr, yr)
+                self.nw[row] = w[xr,yr,:,:]
+                row += 1
+            # w = w[:, :, 0:x.shape[2], :] # Apply mask to w
+            results = np.sqrt(np.sum((self.nw - x) * (self.nw - x), axis=2))
+            self.diff = np.zeros((X_OUT, Y_OUT, IN_MAX, 2))
+            # self.diff = x - self.nw # Calculate differences
+            tdiff = x - self.nw
+            for row in range(indices.shape[0]):
+                self.diff[indices[row, 0], indices[row, 1]] = tdiff[row]
         elif (w.ndim == 3): # If second layer
             results = np.sqrt(np.sum((w - x) * (w - x), axis=2))
-
-        self.diff = x - w # Calculate differences
+            self.diff = x - w
         
         # Get X-Y position of the node with the minimum distance
         bmu = np.unravel_index(np.argmin(results, axis = None), results.shape)
@@ -270,12 +288,12 @@ class Listener(BaseListener):
         """
 
         if (w.ndim == 4):
-            w = w[:, :, 0:self.diff.shape[2], :]
+            # w = w[:, :, 0:self.diff.shape[2], :]
             theta_dt = theta(dist, t).reshape((X_OUT, Y_OUT, 1, 1))
+            w = w + theta_dt * L(t) * self.diff
         elif (w.ndim == 3):
             theta_dt = theta(dist, t).reshape((X_OUT, Y_OUT, 1))
-
-        w += theta_dt * L(t) * self.diff
+            w = w + theta_dt * L(t) * self.diff
 
         return w
 
