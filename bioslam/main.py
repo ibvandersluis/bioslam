@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Copyright 2020 Isaac Vander Sluis
+
 import os
 import sys
 
